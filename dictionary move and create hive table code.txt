@@ -1,0 +1,69 @@
+pscp -pw "jamali1234Ali@" "H:\projebg/dictionary.tsv" root@192.168.174.128:/root/
+
+
+2nd
+hdfs dfs -put /root/dictionary.tsv /tmp/dictionary/
+
+
+
+CREATE EXTERNAL TABLE my_dictionary (
+ type string,
+ length int,
+ word string,
+ pos string,
+ stemmed string,
+ polarity string
+)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY '\t'
+STORED AS TEXTFILE;
+--Following will load data from HDFS directory into Hive table.
+ LOAD DATA INPATH '/tmp/dictionary/dictionary.tsv'  INTO TABLE my_dictionary;
+
+
+
+CREATE OR REPLACE VIEW default.Layer1 AS
+SELECT 
+    created_at,
+    SUBSTR(created_at, 27, 4) AS years,
+    SUBSTR(created_at, 5, 3) AS months,
+    SUBSTR(created_at, 9, 2) AS days,
+    SUBSTR(created_at, 12, 8) AS times,
+    id,
+    LOWER(REGEXP_REPLACE(text, '\n', '')) AS text
+FROM raw_tweets;
+
+
+CREATE OR REPLACE VIEW bd15.Layer2 ASs
+SELECT 
+id,
+words
+FROM 
+bd15.Layer1
+LATERAL VIEW EXPLODE(SPLIT(text, '\\W+')) text AS words;
+
+
+Create or Replace view bd15.Layer3 AS
+select 
+id, L2.words, 
+case d.polarity 
+ when 'negative' then -1
+ when 'positive' then 1
+ else 0 end 
+as polarity
+from Layer2 L2 left outer join my_dictionary d
+on L2.words=d.word;
+
+create or replace view bd15.sentiment as 
+select
+ id,
+ case
+ when sum( polarity ) > 0 then 'positive'
+ when sum( polarity ) < 0 then 'negative'
+ else 'neutral' end as sentiment
+ from layer3 l3 group by id;
+
+SELECT
+ L1.*, s.sentiment
+FROM layer1 L1 LEFT OUTER JOIN sentiment s on L1.id = s.id
+;
+

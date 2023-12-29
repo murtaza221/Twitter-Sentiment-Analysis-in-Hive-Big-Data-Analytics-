@@ -1,0 +1,1 @@
+pscp -pw "jamali1234Ali@" "H:\BigData\project\Received\*.json" root@192.168.174.128:/root/tweet_received && move "H:\BigData\project\Received\*.json" "H:\BigData\project\Processed\"
